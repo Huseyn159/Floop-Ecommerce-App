@@ -1,0 +1,9 @@
+rootProject.name = 'floop-backend'
+
+include 'api-gateway'
+include 'auth-service'
+include 'user-service'
+include 'product-service'
+include 'order-service'
+include 'vendor-service'
+include 'payment-service'

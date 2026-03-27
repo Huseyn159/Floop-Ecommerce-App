@@ -1,0 +1,71 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/auth/**
+
+        - id: user-service
+          uri: ${USER_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - AuthFilter
+
+        - id: vendor-service
+          uri: ${VENDOR_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/vendors/**
+          filters:
+            - AuthFilter
+
+        - id: product-service
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/products/**,/graphql,/graphql/**
+          filters:
+            - AuthFilter
+
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - AuthFilter
+
+        - id: payment-service
+          uri: ${PAYMENT_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/payments/**
+          filters:
+            - AuthFilter
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+
+jwt:
+  secret: ${JWT_SECRET}
+
+springdoc:
+  swagger-ui:
+    urls:
+      - name: auth-service
+        url: http://localhost:8081/v3/api-docs
+      - name: user-service
+        url: http://localhost:8082/v3/api-docs
+      - name: vendor-service
+        url: http://localhost:8083/v3/api-docs
+      - name: order-service
+        url: http://localhost:8085/v3/api-docs
+      - name: payment-service
+        url: http://localhost:8086/v3/api-docs

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module external.linked.project.id="floop-backend" external.linked.project.path="$MODULE_DIR$/floop-backend" external.root.project.path="$MODULE_DIR$/floop-backend" external.system.id="GRADLE" external.system.module.group="com.floop" external.system.module.version="1.0.0" type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$/floop-backend">
+      <excludeFolder url="file://$MODULE_DIR$/floop-backend/.gradle" />
+      <excludeFolder url="file://$MODULE_DIR$/floop-backend/build" />
+    </content>
+    <orderEntry type="jdk" jdkName="17" jdkType="JavaSDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

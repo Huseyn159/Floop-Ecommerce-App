@@ -1,0 +1,165 @@
+# ===== TYPES =====
+
+type Product {
+    id: ID!
+    vendorId: ID!
+    name: String!
+    description: String
+    basePrice: Float!
+    discountedPrice: Float
+    effectivePrice: Float!
+    isOnSale: Boolean!
+    rating: Float!
+    reviewCount: Int!
+    viewCount: Int!
+    salesCount: Int!
+    status: ProductStatus!
+    category: Category!
+    variants: [ProductVariant!]!
+    images: [ProductImage!]!
+    createdAt: String!
+    discountPercentage: Float
+}
+
+type Category {
+    id: ID!
+    name: String!
+    slug: String!
+    description: String
+    imageUrl: String
+    parent: Category
+    children: [Category!]!
+    active: Boolean!
+}
+
+type ProductVariant {
+    id: ID!
+    size: String
+    color: String
+    material: String
+    priceModifier: Float
+    stockQuantity: Int!
+    sku: String!
+}
+
+type ProductImage {
+    id: ID!
+    url: String!
+    isPrimary: Boolean
+    sortOrder: Int
+}
+
+type ProductPage {
+    content: [Product!]!
+    totalElements: Int!
+    totalPages: Int!
+    currentPage: Int!
+    pageSize: Int!
+    hasNext: Boolean!
+}
+
+enum ProductStatus {
+    ACTIVE
+    INACTIVE
+    OUT_OF_STOCK
+    DELETED
+}
+
+# ===== INPUTS =====
+
+input ProductFilter {
+    categoryId: ID
+    vendorId: ID
+    minPrice: Float
+    maxPrice: Float
+    minRating: Float
+    inStockOnly: Boolean
+    onSaleOnly: Boolean
+    searchQuery: String
+}
+
+input ProductInput {
+    name: String!
+    description: String
+    basePrice: Float!
+    categoryId: ID!
+    variants: [ProductVariantInput!]
+}
+
+input ProductVariantInput {
+    size: String
+    color: String
+    material: String
+    priceModifier: Float
+    stockQuantity: Int!
+    sku: String!
+}
+
+input FlashSaleInput {
+    discountedPrice: Float!
+    saleEndTime: String!
+}
+
+# ===== QUERIES =====
+
+type Query {
+    product(id: ID!): Product
+
+    products(
+        filter: ProductFilter
+        page: Int = 0
+        size: Int = 20
+    ): ProductPage!
+
+    # Kateqoriyaya görə popular məhsullar
+    # categoryId null olarsa — bütün kateqoriyalarda
+    popularProducts(
+        categoryId: ID
+        limit: Int = 10
+    ): [Product!]!
+
+    # Son 24 saatda ən çox baxılan
+    trendingProducts(limit: Int = 10): [Product!]!
+
+    # Aktiv flash sale məhsulları
+    flashSaleProducts: [Product!]!
+
+    # Bütün aktiv kateqoriyalar
+    categories: [Category!]!
+
+    # Slug ilə kateqoriya
+    category(slug: String!): Category
+
+    # Vendor-un məhsulları
+    vendorProducts(
+        vendorId: ID!
+        page: Int = 0
+        size: Int = 20
+    ): ProductPage!
+}
+
+# ===== MUTATIONS =====
+
+type Mutation {
+    # Vendor məhsul əlavə edir
+    createProduct(input: ProductInput!): Product!
+
+    # Vendor məhsulunu yeniləyir
+    updateProduct(id: ID!, input: ProductInput!): Product!
+
+    # Vendor məhsulunu silir (soft delete)
+    deleteProduct(id: ID!): Boolean!
+
+    # Flash sale başlat
+    startFlashSale(productId: ID!, input: FlashSaleInput!): Product!
+
+    # Flash sale bitir
+    endFlashSale(productId: ID!): Product!
+
+    # Şəkil əlavə et
+    addProductImage(productId: ID!, url: String!, publicId: String, isPrimary: Boolean): ProductImage
+
+
+    # Şəkil sil
+    removeProductImage(imageId: ID!): Boolean!
+}

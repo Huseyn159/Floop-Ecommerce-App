@@ -1,0 +1,6 @@
+.env
+*.class
+build/
+.gradle/
+.idea/
+*.jar

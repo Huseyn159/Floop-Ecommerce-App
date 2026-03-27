@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package com.floop.grpc;
+option java_package = "com.floop.grpc";
+
+option java_multiple_files = true;
+
+service PaymentGrpcService {
+
+
+  rpc InitiatePayment(PaymentRequest) returns (PaymentResponse);
+
+  rpc CancelPayment(CancelPaymentRequest) returns (CancelPaymentResponse);
+}
+
+
+message PaymentRequest {
+  string order_id = 1;
+  string customer_id = 2;
+  double amount = 3;
+  string currency = 4;
+}
+
+message PaymentResponse {
+  string payment_id = 1;
+  string status = 2;
+  string message = 3;
+}
+
+message CancelPaymentRequest {
+  string payment_id = 1;
+  string reason = 2;
+}
+
+message CancelPaymentResponse {
+  bool success = 1;
+  string message = 2;
+}
+
