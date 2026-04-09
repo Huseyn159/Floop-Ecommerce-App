@@ -22,7 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,6 +32,7 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class OrderServiceImpl implements OrderService {
 
+    private final ProductSnapshotRepository productSnapshotRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderMapper orderMapper;
@@ -44,16 +47,37 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponse createOrder(UUID customerId, CreateOrderRequest request) {
 
-        // Sifariş məbləğini hesabla
-        // Hələlik mock — product-service-dən gələcək
+        List<UUID> productIds = request.getItems().stream()
+                .map(OrderItemRequest::getProductId)
+                .toList();
+
+        Map<UUID, ProductSnapshot> snapshotMap = productSnapshotRepository
+                .findAllById(productIds)
+                .stream()
+                .collect(Collectors.toMap(ProductSnapshot::getProductId, s -> s));
+
+        for (UUID productId : productIds) {
+            ProductSnapshot snapshot = snapshotMap.get(productId);
+            if (snapshot == null) {
+                throw new ProductNotFoundException(productId);
+            }
+            if (!"ACTIVE".equals(snapshot.getStatus())) {
+                throw new ProductNotAvailableException(productId);
+            }
+        }
+
+        UUID vendorId = snapshotMap.values().iterator().next().getVendorId();
+
         double totalAmount = request.getItems().stream()
-                .mapToDouble(item -> item.getQuantity() * 10.0)
+                .mapToDouble(item -> {
+                    ProductSnapshot snapshot = snapshotMap.get(item.getProductId());
+                    return item.getQuantity() * snapshot.getEffectivePrice();
+                })
                 .sum();
 
-        // Sifarişi yarat
         Order order = Order.builder()
                 .customerId(customerId)
-                .vendorId(UUID.randomUUID()) // TODO: product-service-dən al
+                .vendorId(vendorId)
                 .totalAmount(totalAmount)
                 .currency(request.getCurrency())
                 .shippingAddress(request.getShippingAddress())
@@ -64,21 +88,23 @@ public class OrderServiceImpl implements OrderService {
 
         Order saved = orderRepository.save(order);
 
-        // Order item-ları yarat
         List<OrderItem> items = request.getItems().stream()
-                .map(itemRequest -> OrderItem.builder()
-                        .order(saved)
-                        .productId(itemRequest.getProductId())
-                        .variantId(itemRequest.getVariantId())
-                        .quantity(itemRequest.getQuantity())
-                        .unitPrice(10.0) // TODO: product-service-dən al
-                        .totalPrice(itemRequest.getQuantity() * 10.0)
-                        .build())
+                .map(itemRequest -> {
+                    ProductSnapshot snapshot = snapshotMap.get(itemRequest.getProductId());
+                    double unitPrice = snapshot.getEffectivePrice();
+                    return OrderItem.builder()
+                            .order(saved)
+                            .productId(itemRequest.getProductId())
+                            .variantId(itemRequest.getVariantId())
+                            .quantity(itemRequest.getQuantity())
+                            .unitPrice(unitPrice)
+                            .totalPrice(itemRequest.getQuantity() * unitPrice)
+                            .build();
+                })
                 .toList();
 
         orderItemRepository.saveAll(items);
 
-        // gRPC ilə payment başlat
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .orderId(saved.getId().toString())
                 .customerId(customerId.toString())
@@ -86,25 +112,23 @@ public class OrderServiceImpl implements OrderService {
                 .currency(request.getCurrency())
                 .build();
 
-        PaymentResponse paymentResponse = paymentGrpcClient
-                .initiatePayment(paymentRequest);
+        PaymentResponse paymentResponse = paymentGrpcClient.initiatePayment(paymentRequest);
 
         if ("FAILED".equals(paymentResponse.getStatus())) {
             throw new PaymentFailedException(paymentResponse.getMessage());
         }
 
-        // Kafka-ya event göndər
+        // Kafka event
         orderEventProducer.sendOrderPlacedEvent(
                 OrderPlacedEvent.builder()
                         .orderId(saved.getId())
                         .customerId(customerId)
-                        .vendorId(saved.getVendorId())
+                        .vendorId(vendorId)
                         .totalAmount(totalAmount)
                         .currency(request.getCurrency())
                         .build()
         );
 
-        // WebSocket ilə client-ə bildiriş
         webSocketHandler.sendOrderUpdate(saved.getId(), saved.getStatus());
 
         log.info("Order created: orderId={}, customerId={}", saved.getId(), customerId);
@@ -115,7 +139,6 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse getOrder(UUID orderId, UUID userId) {
         Order order = findOrderOrThrow(orderId);
 
-        // Yalnız sifariş sahibi və ya vendor görə bilər
         if (!order.getCustomerId().equals(userId) &&
                 !order.getVendorId().equals(userId)) {
             throw new UnauthorizedOrderAccessException();
@@ -152,12 +175,10 @@ public class OrderServiceImpl implements OrderService {
                                            UpdateOrderStatusRequest request) {
         Order order = findOrderOrThrow(orderId);
 
-        // Yalnız vendor statusu yeniləyə bilər
         if (!order.getVendorId().equals(vendorId)) {
             throw new UnauthorizedOrderAccessException();
         }
 
-        // Status keçid yoxlaması
         validateStatusTransition(order.getStatus(), request.getStatus());
 
         order.setStatus(request.getStatus());
@@ -168,7 +189,6 @@ public class OrderServiceImpl implements OrderService {
 
         Order updated = orderRepository.save(order);
 
-        // WebSocket ilə client-ə bildiriş
         webSocketHandler.sendOrderUpdate(updated.getId(), updated.getStatus());
 
         log.info("Order status updated: orderId={}, status={}",
@@ -186,7 +206,6 @@ public class OrderServiceImpl implements OrderService {
             throw new UnauthorizedOrderAccessException();
         }
 
-        // Yalnız PENDING və CONFIRMED sifarişlər ləğv edilə bilər
         if (order.getStatus() != OrderStatus.PENDING &&
                 order.getStatus() != OrderStatus.CONFIRMED) {
             throw new InvalidOrderStatusException(

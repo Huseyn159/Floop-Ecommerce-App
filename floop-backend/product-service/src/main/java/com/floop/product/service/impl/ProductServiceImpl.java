@@ -1,5 +1,9 @@
 package com.floop.product.service.impl;
 
+import com.floop.product.event.ProductCreatedEvent;
+import com.floop.product.event.ProductDeletedEvent;
+import com.floop.product.event.ProductUpdatedEvent;
+import com.floop.product.event.producer.ProductEventProducer;
 import com.floop.product.dto.*;
 import com.floop.product.dto.mapper.ProductMapper;
 import com.floop.product.entity.*;
@@ -29,6 +33,7 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class ProductServiceImpl implements ProductService {
 
+    private final ProductEventProducer productEventProducer;
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ProductVariantRepository variantRepository;
@@ -100,7 +105,19 @@ public class ProductServiceImpl implements ProductService {
         }
 
         log.info("Product created: id={}, vendorId={}", saved.getId(), vendorId);
+        productEventProducer.sendProductCreated(
+                ProductCreatedEvent.builder()
+                        .productId(saved.getId())
+                        .vendorId(vendorId)
+                        .name(saved.getName())
+                        .basePrice(saved.getBasePrice())
+                        .discountedPrice(saved.getDiscountedPrice())
+                        .saleEndTime(saved.getSaleEndTime())
+                        .status(saved.getStatus().name())
+                        .build()
+        );
         return productMapper.toResponse(saved);
+
     }
 
     @Override
@@ -125,7 +142,21 @@ public class ProductServiceImpl implements ProductService {
             product.setCategory(category);
         }
 
-        return productMapper.toResponse(productRepository.save(product));
+        Product updated = productRepository.save(product);
+
+        productEventProducer.sendProductUpdated(
+                ProductUpdatedEvent.builder()
+                        .productId(updated.getId())
+                        .vendorId(vendorId)
+                        .name(updated.getName())
+                        .basePrice(updated.getBasePrice())
+                        .discountedPrice(updated.getDiscountedPrice())
+                        .saleEndTime(updated.getSaleEndTime())
+                        .status(updated.getStatus().name())
+                        .build()
+        );
+
+        return productMapper.toResponse(updated);
     }
 
     @Override
@@ -143,6 +174,11 @@ public class ProductServiceImpl implements ProductService {
         productRepository.save(product);
 
         log.info("Product soft deleted: id={}", productId);
+        productEventProducer.sendProductDeleted(
+                ProductDeletedEvent.builder()
+                        .productId(productId)
+                        .build()
+        );
         return true;
     }
 
@@ -215,7 +251,21 @@ public class ProductServiceImpl implements ProductService {
         product.setDiscountedPrice(input.getDiscountedPrice());
         product.setSaleEndTime(input.getSaleEndTime());
 
-        return productMapper.toResponse(productRepository.save(product));
+        Product updated = productRepository.save(product);
+
+        productEventProducer.sendProductUpdated(
+                ProductUpdatedEvent.builder()
+                        .productId(updated.getId())
+                        .vendorId(vendorId)
+                        .name(updated.getName())
+                        .basePrice(updated.getBasePrice())
+                        .discountedPrice(updated.getDiscountedPrice())
+                        .saleEndTime(updated.getSaleEndTime())
+                        .status(updated.getStatus().name())
+                        .build()
+        );
+
+        return productMapper.toResponse(updated);
     }
 
     @Override
@@ -231,7 +281,21 @@ public class ProductServiceImpl implements ProductService {
         product.setDiscountedPrice(null);
         product.setSaleEndTime(null);
 
-        return productMapper.toResponse(productRepository.save(product));
+        Product updated = productRepository.save(product);
+
+        productEventProducer.sendProductUpdated(
+                ProductUpdatedEvent.builder()
+                        .productId(updated.getId())
+                        .vendorId(vendorId)
+                        .name(updated.getName())
+                        .basePrice(updated.getBasePrice())
+                        .discountedPrice(null)
+                        .saleEndTime(null)
+                        .status(updated.getStatus().name())
+                        .build()
+        );
+
+        return productMapper.toResponse(updated);
     }
 
     @Override

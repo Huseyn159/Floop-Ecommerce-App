@@ -21,7 +21,8 @@ public class PaymentEventConsumer {
 
     @KafkaListener(
             topics = "payment-result",
-            groupId = "order-service-group"
+            groupId = "order-service-group",
+            containerFactory = "paymentKafkaListenerContainerFactory"
     )
     @Transactional
     public void handlePaymentResult(PaymentResultEvent event) {
@@ -41,7 +42,6 @@ public class PaymentEventConsumer {
 
             orderRepository.save(order);
 
-            // WebSocket ilə client-ə bildiriş göndər
             webSocketHandler.sendOrderUpdate(order.getId(), order.getStatus());
         });
     }

@@ -6,8 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.UUID;
 
-// payment-service bu event-i Kafka-ya göndərir
-// order-service dinləyir → sifarişi CONFIRMED/CANCELLED edir
+
 @Data
 @Builder
 @AllArgsConstructor
